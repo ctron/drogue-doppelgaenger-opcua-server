@@ -5,6 +5,8 @@ import static org.eclipse.milo.opcua.sdk.server.api.config.OpcUaServerConfig.USE
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -27,6 +29,8 @@ import org.slf4j.LoggerFactory;
 
 import io.drogue.doppelgaenger.opcua.ThingsSubscriptionManager;
 import io.drogue.doppelgaenger.opcua.client.Client;
+import io.smallrye.config.ConfigMapping;
+import io.smallrye.config.WithDefault;
 
 public class Server {
 
@@ -38,40 +42,36 @@ public class Server {
 
     private static final String NAME = "Drogue Doppelgänger OPC UA integration";
 
+    @ConfigMapping(prefix = "drogue.doppelgaenger.opcua")
+    public interface Configuration {
+
+        Optional<Set<String>> hostnames();
+
+        @WithDefault("localhost")
+        String bindAddress();
+
+        @WithDefault("4840")
+        int bindPort();
+    }
+
     public static class Builder {
 
-        private final Client client;
+        private final Configuration configuration;
 
-        private Set<String> hostnames = null;
-
-        private final String bindAddress = "localhost";
-
-        private final int bindPort = 4840;
-
-        final ThingsSubscriptionManager subscriptions;
-
-        public Builder(final Client client, final ThingsSubscriptionManager subscriptions) {
-            this.client = client;
-            this.subscriptions = subscriptions;
-        }
-
-        public Builder hostnames(final Set<String> hostnames) {
-            this.hostnames = hostnames;
-            return this;
+        public Builder(final Configuration configuration) {
+            this.configuration = configuration;
         }
 
         Set<EndpointConfiguration> createEndpoints() {
             final var result = new LinkedHashSet<EndpointConfiguration>();
 
-            final Set<String> hostnames;
-            if (this.hostnames != null) {
-                hostnames = this.hostnames;
-            } else {
-                hostnames = new LinkedHashSet<>();
-                hostnames.add(HostnameUtil.getHostname());
-                hostnames.addAll(HostnameUtil.getHostnames("0.0.0.0"));
-                hostnames.addAll(HostnameUtil.getHostnames("::1"));
-            }
+            final Set<String> hostnames = this.configuration.hostnames().orElseGet(() -> {
+                final var r = new LinkedHashSet<String>();
+                r.add(HostnameUtil.getHostname());
+                r.addAll(HostnameUtil.getHostnames("0.0.0.0"));
+                r.addAll(HostnameUtil.getHostnames("::1"));
+                return r;
+            });
 
             Server.logger.info("Announcing hostnames: {}", hostnames);
 
@@ -83,9 +83,10 @@ public class Server {
         }
 
         void buildEndpoint(final String hostname, final Consumer<EndpointConfiguration> consumer) {
+
             final var builder = EndpointConfiguration.newBuilder()
-                    .setBindAddress(this.bindAddress)
-                    .setBindPort(this.bindPort)
+                    .setBindAddress(this.configuration.bindAddress())
+                    .setBindPort(this.configuration.bindPort())
                     .setHostname(hostname)
                     .setPath("/drogue-iot")
                     .setTransportProfile(TransportProfile.TCP_UASC_UABINARY);
@@ -120,7 +121,15 @@ public class Server {
 
         }
 
-        public CompletableFuture<Server> start() {
+        public CompletableFuture<Server> start(
+                final Client client,
+                final ThingsSubscriptionManager subscriptions
+        ) {
+
+            Objects.requireNonNull(client);
+            Objects.requireNonNull(subscriptions);
+
+            Server.logger.info("Binding to: {}:{}", this.configuration.bindAddress(), this.configuration.bindPort());
 
             final var validators = new LinkedList<IdentityValidator<String>>();
             // FIXME: need to use a real one
@@ -150,11 +159,11 @@ public class Server {
 
             final var server = new OpcUaServer(config);
 
-            final var propertyNamespace = new PropertyNamespace(server, this.subscriptions);
+            final var propertyNamespace = new PropertyNamespace(server, subscriptions);
             server.getAddressSpaceManager()
                     .register(propertyNamespace);
 
-            final var namespace = new ThingNamespace(server, propertyNamespace, this.client);
+            final var namespace = new ThingNamespace(server, propertyNamespace, client);
             server.getAddressSpaceManager()
                     .register(namespace);
 

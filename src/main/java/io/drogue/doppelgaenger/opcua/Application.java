@@ -19,6 +19,8 @@ import io.vertx.core.Vertx;
 @Startup
 public class Application {
 
+    private static final String CONFIG_PREFIX = "drogue.doppelgaenger";
+
     private final AtomicReference<Server> server = new AtomicReference<>();
 
     @Inject
@@ -27,15 +29,18 @@ public class Application {
     @Inject
     Vertx vertx;
 
-    @ConfigProperty(name = "drogue.doppelgaenger.api")
+    @ConfigProperty(name = CONFIG_PREFIX + ".api")
     String api;
 
-    @ConfigProperty(name = "drogue.doppelgaenger.application", defaultValue = "default")
+    @ConfigProperty(name = CONFIG_PREFIX + ".application", defaultValue = "default")
     String application;
 
     private Client client;
 
     private ThingsSubscriptionManager subscriptions;
+
+    @Inject
+    Server.Configuration configuration;
 
     @PostConstruct
     public void start() throws Exception {
@@ -45,12 +50,13 @@ public class Application {
                 this.vertx,
                 this.api,
                 this.application,
-                provider);
+                provider
+        );
 
         this.subscriptions = new ThingsSubscriptionManager(this.vertx, URI.create(this.api), this.application, provider);
 
-        this.server.set(new Server.Builder(this.client, this.subscriptions)
-                .start()
+        this.server.set(new Server.Builder(this.configuration)
+                .start(this.client, this.subscriptions)
                 .get());
     }
 
