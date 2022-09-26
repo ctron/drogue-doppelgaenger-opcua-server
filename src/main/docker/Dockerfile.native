@@ -16,7 +16,7 @@
 ###
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
-LABEL org.opencontainers.image.source="https://github.com/drogue-iot/drogue-cloud"
+LABEL org.opencontainers.image.source="https://github.com/drogue-iot/drogue-doppelgaenger-opcua-server"
 
 WORKDIR /work/
 RUN chown 1001 /work \
@@ -25,6 +25,10 @@ RUN chown 1001 /work \
 COPY --chown=1001:root target/*-runner /work/application
 
 EXPOSE 8080
+EXPOSE 4840
+
 USER 1001
+
+ENV DROGUE_DOPPELGAENGER_OPCUA_BIND_ADDRESS="0.0.0.0"
 
 CMD ["./application", "-Dquarkus.http.host=0.0.0.0"]
