@@ -1,0 +1,7 @@
+"%dev":
+  drogue:
+    doppelgaenger:
+      opcua:
+        enable-anonymous: true
+        self-signed-key:
+          mode: ephemeral

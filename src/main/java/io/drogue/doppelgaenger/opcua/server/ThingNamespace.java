@@ -130,7 +130,7 @@ public class ThingNamespace implements AddressSpaceFragment {
             completedFuture(ThingNode.fromId(this.client, this, this.propertyNamespace, nodeId))
                     .thenCompose(ThingNode::browse)
                     .whenComplete((result, err) -> {
-                        logger.debug("Browse - result: {}", result, err);
+                        logger.info("Browse - result: {}", result, err);
                         try {
                             if (result != null) {
                                 context.success(result);

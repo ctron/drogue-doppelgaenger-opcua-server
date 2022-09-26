@@ -8,11 +8,11 @@ import java.util.concurrent.CompletableFuture;
 import org.eclipse.milo.opcua.sdk.core.Reference;
 import org.eclipse.milo.opcua.stack.core.AttributeId;
 import org.eclipse.milo.opcua.stack.core.Identifiers;
+import org.eclipse.milo.opcua.stack.core.StatusCodes;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
 import org.eclipse.milo.opcua.stack.core.types.builtin.LocalizedText;
 import org.eclipse.milo.opcua.stack.core.types.builtin.NodeId;
 import org.eclipse.milo.opcua.stack.core.types.builtin.QualifiedName;
-import org.eclipse.milo.opcua.stack.core.types.builtin.StatusCode;
 import org.eclipse.milo.opcua.stack.core.types.builtin.Variant;
 import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.UByte;
 import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.UInteger;
@@ -97,10 +97,16 @@ public class PropertyNode {
         if (attributeId.equals(AttributeId.MinimumSamplingInterval.uid())) {
             return completedFuture(new DataValue(new Variant(0.0)));
         }
+        if (attributeId.equals(AttributeId.ArrayDimensions.uid())) {
+            return completedFuture(new DataValue(new Variant(null)));
+        }
+        if (attributeId.equals(AttributeId.Historizing.uid())) {
+            return completedFuture(new DataValue(new Variant(false)));
+        }
 
         logger.info("Unhandled read: {}", AttributeId.from(attributeId).map(Object::toString).orElseGet(attributeId::toString));
 
-        return completedFuture(new DataValue(StatusCode.BAD));
+        return completedFuture(new DataValue(StatusCodes.Bad_AttributeIdInvalid));
     }
 
     private String getLocalName() {

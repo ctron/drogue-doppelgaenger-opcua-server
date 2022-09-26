@@ -49,7 +49,7 @@ public class Client implements AutoCloseable {
                                 case 404:
                                     return Optional.empty();
                                 case 200:
-                                    return Optional.ofNullable(response.bodyAsJson(Thing.class));
+                                    return Optional.ofNullable(GsonUtil.create().fromJson(response.bodyAsString(), Thing.class));
                                 default:
                                     throw new RuntimeException("Unexpected status code: " + response.statusCode());
                                 }

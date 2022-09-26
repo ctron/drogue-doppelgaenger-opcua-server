@@ -10,11 +10,11 @@ import java.util.concurrent.CompletableFuture;
 import org.eclipse.milo.opcua.sdk.core.Reference;
 import org.eclipse.milo.opcua.stack.core.AttributeId;
 import org.eclipse.milo.opcua.stack.core.Identifiers;
+import org.eclipse.milo.opcua.stack.core.StatusCodes;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
 import org.eclipse.milo.opcua.stack.core.types.builtin.LocalizedText;
 import org.eclipse.milo.opcua.stack.core.types.builtin.NodeId;
 import org.eclipse.milo.opcua.stack.core.types.builtin.QualifiedName;
-import org.eclipse.milo.opcua.stack.core.types.builtin.StatusCode;
 import org.eclipse.milo.opcua.stack.core.types.builtin.Variant;
 import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.UInteger;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.IdType;
@@ -75,7 +75,7 @@ public class ThingNode {
             return completedFuture(new DataValue(new Variant(LocalizedText.NULL_VALUE)));
         }
 
-        return completedFuture(new DataValue(StatusCode.BAD));
+        return completedFuture(new DataValue(StatusCodes.Bad_AttributeIdInvalid));
     }
 
     public String getLocalName() {
