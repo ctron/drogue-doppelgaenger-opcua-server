@@ -1,75 +1,71 @@
-# integration Project
+# Drogue IoT – OPC UA server for the Doppelgänger Twin state
 
-This project uses Quarkus, the Supersonic Subatomic Java Framework.
+This is a standard Quarkus application, so the following sections only describe to most important aspects of running
+or building this application. All features that Quarkus provides do still apply.
 
-If you want to learn more about Quarkus, please visit its website: https://quarkus.io/ .
+## Running
 
-## Running the application in dev mode
+Either run this as a standard Java application, or using the native binary. The easiest way is to run this using a
+container, for example:
 
-You can run your application in dev mode that enables live coding using:
-
-```shell script
-./mvnw compile quarkus:dev
+```shell
+podman run --rm -ti -p 4840:4840 ghcr.io/drogue-iot/drogue-doppelgaenger-opcua-server:latest
 ```
 
-> **_NOTE:_**  Quarkus now ships with a Dev UI, which is available in dev mode only at http://localhost:8080/q/dev/.
+However, you will need to provide some configuration. The simplest way is to create a `.env` file, and reference
+it during the startup:
 
-## Packaging and running the application
-
-The application can be packaged using:
-
-```shell script
-./mvnw package
+```shell
+podman run --rm -ti -p 4840:4840 --env-file=.env ghcr.io/drogue-iot/drogue-doppelgaenger-opcua-server:latest
 ```
 
-It produces the `quarkus-run.jar` file in the `target/quarkus-app/` directory.
-Be aware that it’s not an _über-jar_ as the dependencies are copied into the `target/quarkus-app/lib/` directory.
+If you want to run a locally built image, use:
 
-The application is now runnable using `java -jar target/quarkus-app/quarkus-run.jar`.
-
-If you want to build an _über-jar_, execute the following command:
-
-```shell script
-./mvnw package -Dquarkus.package.type=uber-jar
+```shell
+podman run --rm -ti -p 4840:4840 --env-file=.env drogue-doppelgaenger-opcua-server
 ```
 
-The application, packaged as an _über-jar_, is now runnable using `java -jar target/*-runner.jar`.
+## Configuration
 
-## Creating a native executable
+The application cannot run without a configuration, as it needs to know the Doppelgaenger backend to use. You can
+provide the configuration in any way you can [configure a Quarkus application](https://quarkus.io/guides/config).
 
-You can create a native executable using:
+| Property                                                                                                                                                                                                                                                                                                    | Type   | Default   |
+|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------|-----------|
+| `drogue.doppelgaenger.api` <br/> The base URL to the Doppelgaenger API<br/>Environment variable: `DROGUE_DOPPELGAENGER_API`                                                                                                                                                                                 | URL    |           |
+| `drogue.doppelgaenger.application` <br/> The name of the application, in case of a multi-instance installation.<br/>`DROGUE_DOPPELGAENGER_APPLICATION`                                                                                                                                                      | String | `default` |
+| `quarkus.oidc-client.auth-server-url` <br/> The URL to the OAuth2 instance used by the Doppelgaeanger instance.<br/>This instance is used in to acquire access tokens for the API.<br/>In case of Keycloak, this is most likely `https://server/realms/<realm>` <br/> `QUARKUS_OIDC_CLIENT_AUTH_SERVER_URL` | URL    |           |
+| `quarkus.oidc-client.client-id` <br/> The OAuth2 Client ID<br/>`QUARKUS_OIDC_CLIENT_CLIENT_ID`                                                                                                                                                                                                              | String |           |
+| `quarkus.odic-client.credentials.secret` <br/> The secret for the Client ID<br/>`QUARKUS_OIDC_CLIENT_CREDENTIALS_SECRET`                                                                                                                                                                                    | String |           |
 
-```shell script
-./mvnw package -Pnative
+Additionally, there are some configuration options for the OPC UA server:
+
+| Property                                                                                                                                                                                                                                                                   | Type           | Default     |
+|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------|-------------|
+| `drogue.doppelgaenger.opcua.bind-address` <br/> The address to bind to.                                                                                                                                                                                                    | `String`       | `localhost` |
+| `drogue.doppelgaenger.opcua.bind-port` <br/> The port to bind to.                                                                                                                                                                                                          | `int`          | `4840`      |
+| `drogue.doppelgaenger.opcua.hostnames` <br/> The hostnames to announce. By default, it will try to auto-detect, based on the local interfaces and DNS. However, when running inside a container, you might need to override this, with an externally resolvable hostname.  | `Set<String>`  |             |
+
+## Developing
+
+You can start the application in developer mode using:
+
+```shell
+mvn compile quarkus:dev
 ```
 
-Or, if you don't have GraalVM installed, you can run the native executable build in a container using:
+## Building
 
-```shell script
-./mvnw package -Pnative -Dquarkus.native.container-build=true
+To build a new image, run:
+
+```shell
+mvn package
+podman build . -f src/main/docker/Dockerfile.jvm -t drogue-doppelgaenger-opcua-server
 ```
 
-You can then execute your native executable with: `./target/integration-1.0-SNAPSHOT-runner`
+To build the native image, run:
 
-If you want to learn more about building native executables, please consult https://quarkus.io/guides/maven-tooling.
-
-## Related Guides
-
-- YAML Configuration ([guide](https://quarkus.io/guides/config#yaml)): Use YAML to configure your Quarkus application
-- SmallRye Health ([guide](https://quarkus.io/guides/microprofile-health)): Monitor service health
-
-## Provided Code
-
-### YAML Config
-
-Configure your application with YAML
-
-[Related guide section...](https://quarkus.io/guides/config-reference#configuration-examples)
-
-The Quarkus application configuration is located in `src/main/resources/application.yml`.
-
-### SmallRye Health
-
-Monitor your application's health using SmallRye Health
-
-[Related guide section...](https://quarkus.io/guides/smallrye-health)
+```shell
+mvn package -Pnative
+podman build . -f src/main/docker/Dockerfile.native
+```
