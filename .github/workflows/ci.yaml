@@ -1,0 +1,142 @@
+name: CI
+
+on:
+  push:
+    # Run on the main branch
+    branches:
+      - main
+    # Releases are tags named 'v<version>', and must have the "major.minor.micro", for example: "0.1.0".
+    # Release candidates are tagged as `v<version>-rc<num>`, for example: "0.1.0-rc1".
+    tags:
+      - "v*"
+  # Also on PRs, just be careful not to publish anything
+  pull_request:
+
+jobs:
+
+  prepare:
+    runs-on: ubuntu-22.04
+
+    outputs:
+      do-publish: ${{steps.state.outputs.do-publish}}
+      release: ${{steps.state.outputs.release}}
+      version: ${{steps.version.outputs.version}}
+      prerelease: ${{steps.state.outputs.prerelease}}
+
+    steps:
+
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      # Gather information for build
+
+      - name: Evaluate state
+        id: state
+        run: |
+          test -z "${{github.head_ref}}" && echo '::set-output name=do-publish::true'
+          if [[ "${{ github.event.ref }}" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo ::set-output name=release::true
+              echo ::set-output name=release::true
+          elif [[ "${{ github.event.ref }}" =~ ^refs/tags/v.*$ ]]; then
+              echo ::set-output name=release::true
+              echo ::set-output name=prerelease::true
+          fi
+
+      - name: Set version
+        if: ${{github.head_ref == ''}}
+        id: version
+        run: |
+          VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
+          [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
+          [ "$VERSION" == "main" ] && VERSION=latest
+          echo VERSION=$VERSION
+          echo "::set-output name=version::$VERSION"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+
+  info:
+    name: info
+    runs-on: ubuntu-22.04
+    needs: [ prepare ]
+    steps:
+      - run: |
+          echo "do-publish: ${{needs.prepare.outputs.do-publish}}"
+          echo "release: ${{steps.state.outputs.release}}"
+          echo "version: ${{steps.version.outputs.version}}"
+          echo "prerelease: ${{steps.state.outputs.prerelease}}"
+
+  build:
+    runs-on: ubuntu-22.04
+
+    needs: [ prepare ]
+
+    env:
+      CONTAINER_REGISTRY: ghcr.io/${{ github.repository_owner }}
+      VERSION: ${{needs.prepare.outputs.version}}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - uses: actions/cache@v3
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Build (jvm)
+        run: |
+          mvn package
+
+      - name: Container (jvm)
+        run: |
+          podman build -f src/main/docker/Dockerfile.jvm -t ${CONTAINER_REGISTRY}/drogue-doppelgaenger-opcua-server:${VERSION}
+
+      - name: Build (native)
+        run: |
+          mvn package -Pnative
+
+      - name: Container (native)
+        run: |
+          podman build -f src/main/docker/Dockerfile.native -t ${CONTAINER_REGISTRY}/drogue-doppelgaenger-opcua-server:${VERSION}-native
+
+      - name: Login to github container repository
+        if: (needs.prepare.outputs.do-publish == 'true')
+        run: echo "${{ secrets.GHCR_PAT }}" | podman login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Tag and push images
+        if: (needs.prepare.outputs.do-publish == 'true')
+        run: |
+          podman push -t ${CONTAINER_REGISTRY}/drogue-doppelgaenger-opcua-server:${VERSION}
+          podman push -t ${CONTAINER_REGISTRY}/drogue-doppelgaenger-opcua-server:${VERSION}-native
+
+      - name: Install convco
+        if: needs.prepare.outputs.release
+        run: |
+          curl -fsSL -o convco.zip https://github.com/convco/convco/releases/download/v0.3.11/convco-ubuntu.zip
+          unzip convco.zip
+          install convco /usr/local/bin
+
+      - name: Generate changelog
+        if: needs.prepare.outputs.release
+        run: |
+          convco changelog --max-versions=1 > /tmp/changelog.md
+
+      - name: Create Release
+        if: needs.prepare.outputs.release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: v${{ needs.prepare.outputs.version }}
+        run: |
+          OPTS=""
+          if [[ "${{ needs.prepare.outputs.prerelease }}" == "true" ]]; then
+            OPTS="${OPTS} -p"
+          fi
+          gh release create $OPTS --title "${{ needs.prepare.outputs.version }}" -F /tmp/changelog.md $TAG $(find server-binaries -type f)
