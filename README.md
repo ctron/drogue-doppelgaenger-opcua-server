@@ -44,7 +44,7 @@ Additionally, there are some configuration options for the OPC UA server:
 |----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------|-------------|
 | `drogue.doppelgaenger.opcua.bind-address` <br/> The address to bind to.                                                                                                                                                                                                    | `String`       | `localhost` |
 | `drogue.doppelgaenger.opcua.bind-port` <br/> The port to bind to.                                                                                                                                                                                                          | `int`          | `4840`      |
-| `drogue.doppelgaenger.opcua.hostnames` <br/> The hostnames to announce. By default, it will try to auto-detect, based on the local interfaces and DNS. However, when running inside a container, you might need to override this, with an externally resolvable hostname.  | `Set<String>`  |             |
+| `drogue.doppelgaenger.opcua.hostnames` <br/> The hostnames to announce. By default, it will try to auto-detect, based on the local interfaces and DNS. However, when running inside a container, you might need to override this, with an externally resolvable hostname.  | `Set<String>`  | *empty*     |
 
 ## Developing
 
