@@ -97,7 +97,7 @@ jobs:
 
       - name: Container (jvm)
         run: |
-          podman build -f src/main/docker/Dockerfile.jvm -t ${CONTAINER_REGISTRY}/drogue-doppelgaenger-opcua-server:${VERSION}
+          podman build . -f src/main/docker/Dockerfile.jvm -t ${CONTAINER_REGISTRY}/drogue-doppelgaenger-opcua-server:${VERSION}
 
       - name: Build (native)
         run: |
@@ -105,7 +105,7 @@ jobs:
 
       - name: Container (native)
         run: |
-          podman build -f src/main/docker/Dockerfile.native -t ${CONTAINER_REGISTRY}/drogue-doppelgaenger-opcua-server:${VERSION}-native
+          podman build . -f src/main/docker/Dockerfile.native -t ${CONTAINER_REGISTRY}/drogue-doppelgaenger-opcua-server:${VERSION}-native
 
       - name: Login to github container repository
         if: (needs.prepare.outputs.do-publish == 'true')
