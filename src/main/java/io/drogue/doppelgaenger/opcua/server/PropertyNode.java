@@ -58,7 +58,7 @@ public class PropertyNode {
                 true
         ));
 
-        logger.info("getReferences -> {}", refs);
+        logger.debug("getReferences -> {}", refs);
 
         return CompletableFuture.completedFuture(refs);
     }

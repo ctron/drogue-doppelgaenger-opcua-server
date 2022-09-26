@@ -63,7 +63,7 @@ public class PropertyNamespace implements AddressSpaceFragment {
 
     @Override
     public void read(final ReadContext context, final Double maxAge, final TimestampsToReturn timestamps, final List<ReadValueId> readValueIds) {
-        logger.info("read: {}", readValueIds);
+        logger.debug("read: {}", readValueIds);
 
         final var result = new ArrayList<DataValue>();
         final var ids = new LinkedList<>(readValueIds);
@@ -71,7 +71,7 @@ public class PropertyNamespace implements AddressSpaceFragment {
         completedFuture(null)
                 .thenCompose(x -> handleRead(ids, result))
                 .whenComplete((x, err) -> {
-                    logger.info("read complete", err);
+                    logger.debug("read complete", err);
                     try {
                         if (err != null) {
                             context.failure(StatusCode.BAD);
@@ -118,7 +118,7 @@ public class PropertyNamespace implements AddressSpaceFragment {
 
     @Override
     public void onDataItemsCreated(final List<DataItem> dataItems) {
-        logger.info("onDataItemsCreated: {}", dataItems);
+        logger.debug("onDataItemsCreated: {}", dataItems);
 
         for (final var item : dataItems) {
             subscribe(item);
@@ -127,12 +127,12 @@ public class PropertyNamespace implements AddressSpaceFragment {
 
     @Override
     public void onDataItemsModified(final List<DataItem> dataItems) {
-        logger.info("onDataItemsModified: {}", dataItems);
+        logger.debug("onDataItemsModified: {}", dataItems);
     }
 
     @Override
     public void onDataItemsDeleted(final List<DataItem> dataItems) {
-        logger.info("onDataItemsDeleted: {}", dataItems);
+        logger.debug("onDataItemsDeleted: {}", dataItems);
 
         for (final var item : dataItems) {
             final var dataItem = this.dataItems.remove(item.getId());
@@ -144,7 +144,7 @@ public class PropertyNamespace implements AddressSpaceFragment {
 
     @Override
     public void onMonitoringModeChanged(final List<MonitoredItem> monitoredItems) {
-        logger.info("onMonitoringModeChanged: {}", monitoredItems);
+        logger.debug("onMonitoringModeChanged: {}", monitoredItems);
     }
 
     private void subscribe(final DataItem item) {
@@ -166,7 +166,7 @@ public class PropertyNamespace implements AddressSpaceFragment {
                 merged = thing.getSyntheticState().get(name);
             }
 
-            logger.info("reportValue - state: {}, merged: {}", thing, merged);
+            logger.debug("reportValue - state: {}, merged: {}", thing, merged);
 
             if (merged != null) {
                 final var value = new DataValue(
@@ -174,7 +174,7 @@ public class PropertyNamespace implements AddressSpaceFragment {
                         StatusCode.GOOD,
                         new DateTime(merged.getLastUpdate().toInstant())
                 );
-                logger.info("Reporting: {}", value);
+                logger.debug("Reporting: {}", value);
                 item.setValue(value);
             } else {
                 item.setQuality(StatusCode.UNCERTAIN);
@@ -227,14 +227,14 @@ public class PropertyNamespace implements AddressSpaceFragment {
 
     @Override
     public void browse(final BrowseContext context, final ViewDescription view, final NodeId nodeId) {
-        logger.info("browse: {}", nodeId);
+        logger.debug("browse: {}", nodeId);
 
         context.success(List.of());
     }
 
     @Override
     public void getReferences(final BrowseContext context, final ViewDescription view, final NodeId nodeId) {
-        logger.info("getReferences: {}", nodeId);
+        logger.debug("getReferences: {}", nodeId);
 
         if (nodeId.getNamespaceIndex().equals(this.namespaceIndex)) {
             // client node
@@ -244,7 +244,7 @@ public class PropertyNamespace implements AddressSpaceFragment {
                 completedFuture(node)
                         .thenCompose(PropertyNode::getReferences)
                         .whenComplete((result, err) -> {
-                            logger.info("getReferences: {}", result, err);
+                            logger.debug("getReferences: {}", result, err);
                             if (result != null) {
                                 context.success(result);
                             } else {

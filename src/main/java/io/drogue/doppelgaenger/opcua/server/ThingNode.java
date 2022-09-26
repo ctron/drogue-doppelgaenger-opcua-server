@@ -99,7 +99,7 @@ public class ThingNode {
         ofNullable(state.remove("$children"))
                 .flatMap(BasicFeature::asObject)
                 .map(c -> {
-                    logger.info("Children: {}", c);
+                    logger.debug("Children: {}", c);
                     return c;
                 })
                 .stream().flatMap(c -> c.keySet().stream())

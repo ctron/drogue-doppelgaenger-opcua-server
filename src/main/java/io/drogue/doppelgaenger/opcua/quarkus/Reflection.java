@@ -28,6 +28,11 @@ import org.eclipse.milo.opcua.stack.core.types.enumerated.UserTokenType;
 
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
+/**
+ * All these classes will be registered for reflection.
+ * <p>
+ * This is required as Milo will use reflection during deserialization, and native compilation must be aware of those classes.
+ */
 @RegisterForReflection(targets = {
         ApplicationType.class,
         AxisScaleEnumeration.class,

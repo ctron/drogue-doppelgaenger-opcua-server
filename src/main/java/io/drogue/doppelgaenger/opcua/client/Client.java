@@ -11,8 +11,6 @@ import io.vertx.ext.web.client.WebClientOptions;
 
 public class Client implements AutoCloseable {
 
-    private final Vertx vertx;
-
     private final String api;
 
     private final String application;
@@ -22,7 +20,6 @@ public class Client implements AutoCloseable {
     private final WebClient client;
 
     public Client(final Vertx vertx, final String api, final String application, final AuthenticationProvider authenticationProvider) {
-        this.vertx = vertx;
         this.api = api;
         this.application = application;
         this.authenticationProvider = authenticationProvider;

@@ -53,7 +53,7 @@ public class ThingNamespace implements AddressSpaceFragment {
 
     @Override
     public void read(final ReadContext context, final Double maxAge, final TimestampsToReturn timestamps, final List<ReadValueId> readValueIds) {
-        logger.info("read: {}", readValueIds);
+        logger.debug("read: {}", readValueIds);
 
         final var result = new ArrayList<DataValue>();
         final var ids = new LinkedList<>(readValueIds);
@@ -61,7 +61,7 @@ public class ThingNamespace implements AddressSpaceFragment {
         completedFuture(null)
                 .thenCompose(x -> handleRead(ids, result))
                 .whenComplete((x, err) -> {
-                    logger.info("read complete", err);
+                    logger.debug("read complete", err);
                     try {
                         if (err != null) {
                             context.failure(StatusCode.BAD);
@@ -123,14 +123,14 @@ public class ThingNamespace implements AddressSpaceFragment {
 
     @Override
     public void browse(final BrowseContext context, final ViewDescription view, final NodeId nodeId) {
-        logger.info("browse: {}", nodeId);
+        logger.debug("browse: {}", nodeId);
 
         if (nodeId.getNamespaceIndex().equals(this.namespaceIndex)) {
             // client node
             completedFuture(ThingNode.fromId(this.client, this, this.propertyNamespace, nodeId))
                     .thenCompose(ThingNode::browse)
                     .whenComplete((result, err) -> {
-                        logger.info("Browse - result: {}", result, err);
+                        logger.debug("Browse - result: {}", result, err);
                         try {
                             if (result != null) {
                                 context.success(result);
@@ -150,7 +150,7 @@ public class ThingNamespace implements AddressSpaceFragment {
 
     @Override
     public void getReferences(final BrowseContext context, final ViewDescription view, final NodeId nodeId) {
-        logger.info("getReferences: {}", nodeId);
+        logger.debug("getReferences: {}", nodeId);
         if (nodeId.equals(Identifiers.ObjectsFolder)) {
             context.success(List.of(
                     new Reference(
