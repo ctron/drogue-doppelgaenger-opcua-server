@@ -17,6 +17,7 @@
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
 LABEL org.opencontainers.image.source="https://github.com/drogue-iot/drogue-doppelgaenger-opcua-server"
+LABEL org.opencontainers.image.description="OPC UA server for Drogue IoT Doppelgaenger (native image)"
 
 WORKDIR /work/
 RUN chown 1001 /work \

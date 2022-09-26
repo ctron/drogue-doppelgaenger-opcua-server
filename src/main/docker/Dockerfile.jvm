@@ -78,6 +78,7 @@
 FROM registry.access.redhat.com/ubi9/openjdk-17-runtime:latest
 
 LABEL org.opencontainers.image.source="https://github.com/drogue-iot/drogue-doppelgaenger-opcua-server"
+LABEL org.opencontainers.image.description="OPC UA server for Drogue IoT Doppelgaenger"
 
 ENV LANG='en_US.UTF-8' LANGUAGE='en_US:en'
 
