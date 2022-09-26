@@ -91,6 +91,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
 
+      - name: Login to github container repository
+        if: (needs.prepare.outputs.do-publish == 'true')
+        run: echo "${{ secrets.GHCR_PAT }}" | podman login ghcr.io -u ${{ github.actor }} --password-stdin
+
       - name: Build (jvm)
         run: |
           mvn -B package
@@ -106,10 +110,6 @@ jobs:
       - name: Container (native)
         run: |
           podman build . -f src/main/docker/Dockerfile.native -t ${CONTAINER_REGISTRY}/drogue-doppelgaenger-opcua-server:${VERSION}-native
-
-      - name: Login to github container repository
-        if: (needs.prepare.outputs.do-publish == 'true')
-        run: echo "${{ secrets.GHCR_PAT }}" | podman login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Tag and push images
         if: (needs.prepare.outputs.do-publish == 'true')
