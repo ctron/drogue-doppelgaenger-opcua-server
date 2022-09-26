@@ -58,7 +58,7 @@ public class PropertyNamespace implements AddressSpaceFragment {
 
     @Override
     public AddressSpaceFilter getFilter() {
-        return new NamespaceIndexFilter(this.namespaceIndex);
+        return new NamespaceIndexFilter(this.namespaceIndex, true);
     }
 
     @Override
