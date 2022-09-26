@@ -93,7 +93,7 @@ jobs:
 
       - name: Build (jvm)
         run: |
-          mvn package
+          mvn -B package
 
       - name: Container (jvm)
         run: |
@@ -101,7 +101,7 @@ jobs:
 
       - name: Build (native)
         run: |
-          mvn package -Pnative
+          mvn -B package -Pnative
 
       - name: Container (native)
         run: |
