@@ -4,6 +4,7 @@ import static org.eclipse.milo.opcua.sdk.server.api.config.OpcUaServerConfig.USE
 import static org.eclipse.milo.opcua.sdk.server.api.config.OpcUaServerConfig.USER_TOKEN_POLICY_USERNAME;
 import static org.eclipse.milo.opcua.stack.core.StatusCodes.Bad_ConfigurationError;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.security.cert.X509Certificate;
 import java.util.LinkedHashSet;
@@ -24,6 +25,7 @@ import org.eclipse.milo.opcua.sdk.server.identity.UsernameIdentityValidator;
 import org.eclipse.milo.opcua.sdk.server.util.HostnameUtil;
 import org.eclipse.milo.opcua.stack.core.UaRuntimeException;
 import org.eclipse.milo.opcua.stack.core.security.DefaultCertificateManager;
+import org.eclipse.milo.opcua.stack.core.security.DefaultTrustListManager;
 import org.eclipse.milo.opcua.stack.core.security.SecurityPolicy;
 import org.eclipse.milo.opcua.stack.core.transport.TransportProfile;
 import org.eclipse.milo.opcua.stack.core.types.builtin.LocalizedText;
@@ -31,11 +33,13 @@ import org.eclipse.milo.opcua.stack.core.types.enumerated.MessageSecurityMode;
 import org.eclipse.milo.opcua.stack.core.types.structured.BuildInfo;
 import org.eclipse.milo.opcua.stack.core.util.CertificateUtil;
 import org.eclipse.milo.opcua.stack.server.EndpointConfiguration;
+import org.eclipse.milo.opcua.stack.server.security.DefaultServerCertificateValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.drogue.doppelgaenger.opcua.ThingsSubscriptionManager;
 import io.drogue.doppelgaenger.opcua.client.Client;
+import io.drogue.doppelgaenger.opcua.milo.AllowAllServerCertificateValidator;
 import io.drogue.doppelgaenger.opcua.milo.BuildInfoLoader;
 import io.drogue.doppelgaenger.opcua.milo.KeyCertMaterial;
 import io.smallrye.config.ConfigMapping;
@@ -73,6 +77,12 @@ public class Server {
 
         @WithDefault(DEFAULT_PRODUCT_URI)
         String productUri();
+
+        @WithDefault("false")
+        boolean acceptAllClientCertificates();
+
+        @WithDefault("/tmp/milo/pki")
+        Path pkiDirectory();
     }
 
     public enum SelfSignedMode {
@@ -335,9 +345,41 @@ public class Server {
                     .setIdentityValidator(new CompositeValidator<>(validators))
                     .setEndpoints(endpoints);
 
-            certificateManager.ifPresent(config::setCertificateManager);
+            certificateManager.ifPresent(cm -> {
+                config.setCertificateManager(cm);
+
+                if (this.configuration.acceptAllClientCertificates()) {
+
+                    final var certificateValidator =
+                            new AllowAllServerCertificateValidator();
+
+                    config
+                            .setCertificateValidator(certificateValidator);
+
+                } else {
+
+                    final DefaultTrustListManager trustListManager;
+                    try {
+                        trustListManager = new DefaultTrustListManager(this.configuration.pkiDirectory().toFile());
+                    } catch (final IOException e) {
+                        throw new RuntimeException(e);
+                    }
+
+                    final var certificateValidator =
+                            new DefaultServerCertificateValidator(trustListManager);
+
+                    config
+                            .setTrustListManager(trustListManager)
+                            .setCertificateValidator(certificateValidator);
+                }
+
+            });
+
+            // create server
 
             final var server = new OpcUaServer(config.build());
+
+            // register namespaces
 
             final var propertyNamespace = new PropertyNamespace(server, subscriptions);
             server.getAddressSpaceManager()
@@ -346,6 +388,8 @@ public class Server {
             final var namespace = new ThingNamespace(server, propertyNamespace, client);
             server.getAddressSpaceManager()
                     .register(namespace);
+
+            // startup
 
             return server.startup()
                     .thenApply(Server::new);

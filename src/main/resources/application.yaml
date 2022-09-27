@@ -5,3 +5,4 @@
         enable-anonymous: true
         self-signed-key:
           mode: ephemeral
+        accept-all-client-certificates: true
