@@ -114,8 +114,8 @@ jobs:
       - name: Tag and push images
         if: (needs.prepare.outputs.do-publish == 'true')
         run: |
-          podman push ${CONTAINER_REGISTRY}/drogue-doppelgaenger-opcua-server:${VERSION}
           podman push ${CONTAINER_REGISTRY}/drogue-doppelgaenger-opcua-server:${VERSION}-native
+          podman push ${CONTAINER_REGISTRY}/drogue-doppelgaenger-opcua-server:${VERSION}
 
       - name: Install convco
         if: needs.prepare.outputs.release
