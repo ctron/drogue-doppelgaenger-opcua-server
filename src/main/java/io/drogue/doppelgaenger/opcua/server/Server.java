@@ -6,7 +6,6 @@ import static org.eclipse.milo.opcua.stack.core.StatusCodes.Bad_ConfigurationErr
 
 import java.nio.file.Path;
 import java.security.cert.X509Certificate;
-import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.Map;
@@ -27,7 +26,6 @@ import org.eclipse.milo.opcua.stack.core.UaRuntimeException;
 import org.eclipse.milo.opcua.stack.core.security.DefaultCertificateManager;
 import org.eclipse.milo.opcua.stack.core.security.SecurityPolicy;
 import org.eclipse.milo.opcua.stack.core.transport.TransportProfile;
-import org.eclipse.milo.opcua.stack.core.types.builtin.DateTime;
 import org.eclipse.milo.opcua.stack.core.types.builtin.LocalizedText;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.MessageSecurityMode;
 import org.eclipse.milo.opcua.stack.core.types.structured.BuildInfo;
@@ -38,6 +36,7 @@ import org.slf4j.LoggerFactory;
 
 import io.drogue.doppelgaenger.opcua.ThingsSubscriptionManager;
 import io.drogue.doppelgaenger.opcua.client.Client;
+import io.drogue.doppelgaenger.opcua.milo.BuildInfoLoader;
 import io.drogue.doppelgaenger.opcua.milo.KeyCertMaterial;
 import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;
@@ -46,9 +45,9 @@ public class Server {
 
     private static final Logger logger = LoggerFactory.getLogger(Server.class);
 
-    private static final String APPLICATION_URI = "https://drogue.io";
+    private static final String DEFAULT_APPLICATION_URI = "https://drogue.io/doppelgaenger/opcua";
 
-    private static final String PRODUCT_URI = "https://drogue.io";
+    private static final String DEFAULT_PRODUCT_URI = "https://drogue.io";
 
     private static final String NAME = "Drogue Doppelgänger OPC UA integration";
 
@@ -71,6 +70,9 @@ public class Server {
         Optional<SelfSignedKey> selfSignedKey();
 
         Optional<ServerKey> serverKey();
+
+        @WithDefault(DEFAULT_PRODUCT_URI)
+        String productUri();
     }
 
     public enum SelfSignedMode {
@@ -205,14 +207,14 @@ public class Server {
                     kc = KeyCertMaterial.loadOrCreateSelfSigned(
                             ssk.location(),
                             hostnames,
-                            Server.APPLICATION_URI
+                            Server.DEFAULT_APPLICATION_URI
                     );
                     break;
                 }
                 case Ephemeral: {
                     kc = KeyCertMaterial.createSelfSigned(
                             hostnames,
-                            Server.APPLICATION_URI
+                            Server.DEFAULT_APPLICATION_URI
                     );
                     break;
                 }
@@ -237,13 +239,35 @@ public class Server {
             Objects.requireNonNull(client);
             Objects.requireNonNull(subscriptions);
 
+            // core information
+
             if (this.configuration.enableAnonymous()) {
-                Server.logger.warn("Enabling anonymous authentication");
+                logger.warn("Enabling anonymous authentication");
             } else if (this.configuration.users().isEmpty()) {
-                Server.logger.warn("No authentication options configured. All connection attempts will be rejected.");
+                logger.warn("No authentication options configured. All connection attempts will be rejected.");
             }
 
-            Server.logger.info("Binding to: {}:{}", this.configuration.bindAddress(), this.configuration.bindPort());
+            logger.info("Drogue IoT - Doppelgaenger OPC UA server");
+
+            // build information
+
+            final var buildInfoBuilder = BuildInfo.builder()
+                    .productName(NAME)
+                    .productUri(this.configuration.productUri())
+                    .manufacturerName("Drogue IoT");
+
+            BuildInfoLoader.load(buildInfoBuilder);
+
+            final var buildInfo = buildInfoBuilder.build();
+
+            logger.info("    Manufacturer Name: {}", buildInfo.getManufacturerName());
+            logger.info("    Product URI:       {}", buildInfo.getProductUri());
+            logger.info("    Product Name:      {}", buildInfo.getProductName());
+            logger.info("    Version:           {}", buildInfo.getSoftwareVersion());
+            logger.info("    Build Number:      {}", buildInfo.getBuildNumber());
+            logger.info("    Build Date:        {}", buildInfo.getBuildDate());
+
+            logger.info("Binding to: {}:{}", this.configuration.bindAddress(), this.configuration.bindPort());
 
             final var hostnames = createHostnames();
 
@@ -257,7 +281,15 @@ public class Server {
                         l.getServerCertificateChain()
                 );
 
-                cm.getCertificates().forEach(c -> Server.logger.info("Certificate: {}", c));
+                cm.getCertificates().forEach(c -> {
+                    String san;
+                    try {
+                        san = String.format("%s", c.getSubjectAlternativeNames());
+                    } catch (final Exception e) {
+                        san = String.format("<error: %s>", e);
+                    }
+                    logger.info("Certificate: {}: {}", c.getSubjectX500Principal(), san);
+                });
 
                 return cm;
             });
@@ -287,7 +319,7 @@ public class Server {
                                     .getSanUri(c)
                                     .orElseThrow(() -> new UaRuntimeException(Bad_ConfigurationError, "certificate is missing the application URI"))
                     )
-                    .orElse(Server.APPLICATION_URI);
+                    .orElse(Server.DEFAULT_APPLICATION_URI);
 
             // endpoints
 
@@ -297,16 +329,9 @@ public class Server {
 
             final var config = OpcUaServerConfig.builder()
                     .setApplicationUri(applicationUri)
-                    .setApplicationName(LocalizedText.english(Server.NAME))
-                    .setBuildInfo(new BuildInfo(
-                            Server.PRODUCT_URI,
-                            "Drogue IoT",
-                            Server.NAME,
-                            OpcUaServer.SDK_VERSION,
-                            "0",
-                            new DateTime(Instant.parse("2022-09-23T08:47:00Z")))
-                    )
-                    .setProductUri(Server.PRODUCT_URI)
+                    .setApplicationName(LocalizedText.english(NAME))
+                    .setBuildInfo(buildInfo)
+                    .setProductUri(this.configuration.productUri())
                     .setIdentityValidator(new CompositeValidator<>(validators))
                     .setEndpoints(endpoints);
 

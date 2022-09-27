@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>io.drogue.doppelgaenger.opcua</groupId>
     <artifactId>integration</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0.0-SNAPSHOT</version>
 
     <licenses>
         <license>
@@ -25,6 +25,7 @@
         <quarkus.platform.version>2.12.3.Final</quarkus.platform.version>
         <skipITs>true</skipITs>
         <surefire-plugin.version>3.0.0-M7</surefire-plugin.version>
+        <git-commit-plugin.version>5.0.0</git-commit-plugin.version>
 
         <milo.version>0.6.8</milo.version>
     </properties>
@@ -63,10 +64,6 @@
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-oidc-client</artifactId>
         </dependency>
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-smallrye-health</artifactId>
-        </dependency>
 
         <!-- milo -->
 
@@ -93,6 +90,24 @@
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>io.github.git-commit-id</groupId>
+                <artifactId>git-commit-id-maven-plugin</artifactId>
+                <version>${git-commit-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>get-the-git-infos</id>
+                        <goals>
+                            <goal>revision</goal>
+                        </goals>
+                        <phase>initialize</phase>
+                    </execution>
+                </executions>
+                <configuration>
+                    <generateGitPropertiesFile>true</generateGitPropertiesFile>
+                    <dateFormat>yyyy-MM-dd'T'HH:mm:ssX</dateFormat>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>${quarkus.platform.group-id}</groupId>
                 <artifactId>quarkus-maven-plugin</artifactId>
@@ -161,6 +176,7 @@
                 <skipITs>false</skipITs>
                 <quarkus.package.type>native</quarkus.package.type>
                 <quarkus.native.additional-build-args>--initialize-at-run-time=org.eclipse.milo.opcua.stack.core.util.BufferUtil,--initialize-at-run-time=org.eclipse.milo.opcua.stack.core.util.NonceUtil</quarkus.native.additional-build-args>
+                <quarkus.native.resources.includes>git.properties</quarkus.native.resources.includes>
             </properties>
         </profile>
     </profiles>
