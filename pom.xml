@@ -28,6 +28,7 @@
         <git-commit-plugin.version>5.0.0</git-commit-plugin.version>
 
         <milo.version>0.6.8</milo.version>
+        <pem-keystore.version>2.2.1</pem-keystore.version>
     </properties>
 
     <dependencyManagement>
@@ -63,6 +64,13 @@
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-oidc-client</artifactId>
+        </dependency>
+
+        <!-- PEM keystore -->
+        <dependency>
+            <groupId>de.dentrassi.crypto</groupId>
+            <artifactId>pem-keystore</artifactId>
+            <version>${pem-keystore.version}</version>
         </dependency>
 
         <!-- milo -->

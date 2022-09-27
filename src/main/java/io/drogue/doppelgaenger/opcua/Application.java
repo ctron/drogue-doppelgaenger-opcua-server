@@ -44,6 +44,7 @@ public class Application {
 
     @PostConstruct
     public void start() throws Exception {
+        
         final var provider = new OidcAuthenticationProvider(this.oidcClient);
 
         this.client = new Client(
