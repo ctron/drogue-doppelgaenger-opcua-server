@@ -2,6 +2,9 @@ package io.drogue.doppelgaenger.opcua.server;
 
 import static java.util.concurrent.CompletableFuture.completedFuture;
 
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -15,7 +18,7 @@ import org.eclipse.milo.opcua.sdk.server.api.AddressSpaceFilter;
 import org.eclipse.milo.opcua.sdk.server.api.AddressSpaceFragment;
 import org.eclipse.milo.opcua.sdk.server.api.DataItem;
 import org.eclipse.milo.opcua.sdk.server.api.MonitoredItem;
-import org.eclipse.milo.opcua.stack.core.types.builtin.ByteString;
+import org.eclipse.milo.opcua.stack.core.StatusCodes;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DateTime;
 import org.eclipse.milo.opcua.stack.core.types.builtin.NodeId;
@@ -36,8 +39,6 @@ import com.google.gson.JsonElement;
 import io.drogue.doppelgaenger.opcua.ThingsSubscriptionManager;
 import io.drogue.doppelgaenger.opcua.client.BasicFeature;
 import io.drogue.doppelgaenger.opcua.client.Thing;
-import io.vertx.core.buffer.Buffer;
-import io.vertx.core.json.JsonObject;
 
 public class PropertyNamespace implements AddressSpaceFragment {
 
@@ -71,6 +72,7 @@ public class PropertyNamespace implements AddressSpaceFragment {
         completedFuture(null)
                 .thenCompose(x -> handleRead(ids, result))
                 .whenComplete((x, err) -> {
+
                     logger.debug("read complete", err);
                     try {
                         if (err != null) {
@@ -95,18 +97,23 @@ public class PropertyNamespace implements AddressSpaceFragment {
             return completedFuture(null);
         } else {
             final var node = fromId(next.getNodeId());
-            return node
-                    .readAttribute(next.getAttributeId())
-                    .handle((value, err) -> {
-                        if (value != null) {
-                            result.add(value);
-                        } else {
-                            result.add(new DataValue(StatusCode.BAD));
-                        }
-                        return handleRead(ids, result);
-                    })
-                    // take the future and wait for it
-                    .thenCompose(x -> x);
+            if (node == null) {
+                result.add(new DataValue(StatusCodes.Bad_NodeIdInvalid));
+                return handleRead(ids, result);
+            } else {
+                return node
+                        .readAttribute(next.getAttributeId())
+                        .handle((value, err) -> {
+                            if (value != null) {
+                                result.add(value);
+                            } else {
+                                result.add(new DataValue(StatusCode.BAD));
+                            }
+                            return handleRead(ids, result);
+                        })
+                        // take the future and wait for it
+                        .thenCompose(x -> x);
+            }
         }
     }
 
@@ -150,10 +157,16 @@ public class PropertyNamespace implements AddressSpaceFragment {
     private void subscribe(final DataItem item) {
         final var node = fromId(item.getReadValueId().getNodeId());
 
+        if (node == null) {
+            item.setQuality(new StatusCode(StatusCodes.Bad_NodeIdInvalid));
+            return;
+        }
+
         final var name = node.getName();
         final var subscription = this.subscriptions.createSubscription(node.getThing(), name, state -> {
             reportValue(name, item, state);
         });
+        // FIXME: we might have more than one subscription on an item
         this.dataItems.put(item.getId(), subscription);
     }
 
@@ -219,8 +232,6 @@ public class PropertyNamespace implements AddressSpaceFragment {
             return new Variant(array);
         }
 
-        // FIXME: convert everything else to string for now
-
         return new Variant(value.toString());
 
     }
@@ -261,28 +272,51 @@ public class PropertyNamespace implements AddressSpaceFragment {
     }
 
     NodeId propertyNodeId(final String thing, final String name) {
-
-        final var json = new JsonObject()
-                .put("thing", thing)
-                .put("name", name).toBuffer();
-
-        return new NodeId(this.namespaceIndex, ByteString.of(json.getBytes()));
+        final var s = thing + "#" + URLEncoder.encode(name, StandardCharsets.UTF_8);
+        return new NodeId(this.namespaceIndex, s);
     }
 
+    /**
+     * Create a node instance from a node id.
+     * <p>
+     * This is the inverse operation of {@link PropertyNamespace#propertyNodeId(String, String)}.
+     *
+     * @param id The node id.
+     * @return The node, or {@code null} if it wasn't a valid id.
+     */
     PropertyNode fromId(final NodeId id) {
+        if (!id.getNamespaceIndex().equals(this.namespaceIndex)) {
+            return null;
+        }
         if (!id.getType().equals(IdType.Opaque)) {
             return null;
         }
 
         try {
-            final ByteString s = (ByteString) id.getIdentifier();
-            final var json = new JsonObject(Buffer.buffer(s.bytesOrEmpty()));
-            final var thing = json.getString("thing");
-            final var name = json.getString("name");
-            return new PropertyNode(id, thing, name, this);
+            final var split = splitNodeId(id.getIdentifier());
+            return new PropertyNode(id, split[0], split[1], this);
         } catch (final Exception e) {
             return null;
         }
 
+    }
+
+    static String[] splitNodeId(final Object idValue) throws Exception {
+        if (!(idValue instanceof final String s)) {
+            return null;
+        }
+
+        final var fragmentPos = s.lastIndexOf('#');
+        if (fragmentPos < 0 || fragmentPos + 1 >= s.length()) {
+            return null;
+        }
+
+        final var thing = s.substring(0, fragmentPos);
+        final var feature = s.substring(fragmentPos + 1);
+        if (thing.isEmpty() || feature.isEmpty()) {
+            return null;
+        }
+
+        return new String[] { thing, URLDecoder.decode(feature, StandardCharsets.UTF_8) };
     }
 }

@@ -3,8 +3,8 @@
          xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>io.drogue.doppelgaenger.opcua</groupId>
-    <artifactId>integration</artifactId>
+    <groupId>io.drogue.doppelgaenger</groupId>
+    <artifactId>opcua-integration</artifactId>
     <version>1.0.0-SNAPSHOT</version>
 
     <licenses>
@@ -92,6 +92,11 @@
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-junit5</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-params</artifactId>
             <scope>test</scope>
         </dependency>
 
