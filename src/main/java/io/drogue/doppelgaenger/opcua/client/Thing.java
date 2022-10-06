@@ -3,6 +3,7 @@ package io.drogue.doppelgaenger.opcua.client;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import com.google.common.base.MoreObjects;
 
@@ -39,6 +40,8 @@ public class Thing {
         Objects.requireNonNull(other);
 
         this.metadata = new Metadata(other.metadata);
+        this.reportedState = new HashMap<>(other.reportedState);
+        this.syntheticState = new HashMap<>(other.syntheticState);
     }
 
     @Override
@@ -81,5 +84,13 @@ public class Thing {
         result.putAll(this.syntheticState);
 
         return result;
+    }
+
+    public Optional<BasicFeature> mergedState(final String name) {
+        final BasicFeature state = this.syntheticState.get(name);
+        if (state != null) {
+            return Optional.of(state);
+        }
+        return Optional.ofNullable(this.reportedState.get(name));
     }
 }

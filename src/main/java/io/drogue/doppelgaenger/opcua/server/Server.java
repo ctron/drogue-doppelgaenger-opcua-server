@@ -381,7 +381,7 @@ public class Server {
 
             // register namespaces
 
-            final var propertyNamespace = new PropertyNamespace(server, subscriptions);
+            final var propertyNamespace = new PropertyNamespace(server, subscriptions, client);
             server.getAddressSpaceManager()
                     .register(propertyNamespace);
 

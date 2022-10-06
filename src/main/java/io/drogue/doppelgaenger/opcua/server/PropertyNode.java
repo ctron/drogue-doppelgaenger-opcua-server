@@ -3,6 +3,7 @@ package io.drogue.doppelgaenger.opcua.server;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 import org.eclipse.milo.opcua.sdk.core.Reference;
@@ -20,6 +21,9 @@ import org.eclipse.milo.opcua.stack.core.types.enumerated.NodeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.drogue.doppelgaenger.opcua.client.Client;
+import io.drogue.doppelgaenger.opcua.client.Thing;
+
 public class PropertyNode {
 
     private static final Logger logger = LoggerFactory.getLogger(PropertyNode.class);
@@ -32,11 +36,14 @@ public class PropertyNode {
 
     private final PropertyNamespace namespace;
 
-    PropertyNode(final NodeId nodeId, final String thing, final String name, final PropertyNamespace namespace) {
+    private final Client client;
+
+    PropertyNode(final NodeId nodeId, final String thing, final String name, final PropertyNamespace namespace, final Client client) {
         this.nodeId = nodeId;
         this.thing = thing;
         this.name = name;
         this.namespace = namespace;
+        this.client = client;
     }
 
     public String getThing() {
@@ -104,6 +111,12 @@ public class PropertyNode {
             return completedFuture(new DataValue(new Variant(false)));
         }
 
+        if (attributeId.equals(AttributeId.Value.uid())) {
+            logger.debug("Reading actual value");
+            return this.client.get(this.thing)
+                    .thenApply(this::convertValue);
+        }
+
         logger.info("Unhandled read: {}", AttributeId.from(attributeId).map(Object::toString).orElseGet(attributeId::toString));
 
         return completedFuture(new DataValue(StatusCodes.Bad_AttributeIdInvalid));
@@ -111,6 +124,20 @@ public class PropertyNode {
 
     private String getLocalName() {
         return this.name;
+    }
+
+    DataValue convertValue(final Optional<Thing> result) {
+
+        logger.debug("Convert value: {}", result);
+
+        final var merged = result.flatMap(thing -> thing.mergedState(this.name));
+
+        if (merged.isEmpty()) {
+            return new DataValue(StatusCodes.Bad_NotFound);
+        }
+
+        return Values.toDataValue(merged);
+
     }
 
 }

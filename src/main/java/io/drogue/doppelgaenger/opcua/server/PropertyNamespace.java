@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.milo.opcua.sdk.server.OpcUaServer;
 import org.eclipse.milo.opcua.sdk.server.api.AddressSpaceFilter;
 import org.eclipse.milo.opcua.sdk.server.api.AddressSpaceFragment;
@@ -20,10 +21,8 @@ import org.eclipse.milo.opcua.sdk.server.api.DataItem;
 import org.eclipse.milo.opcua.sdk.server.api.MonitoredItem;
 import org.eclipse.milo.opcua.stack.core.StatusCodes;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
-import org.eclipse.milo.opcua.stack.core.types.builtin.DateTime;
 import org.eclipse.milo.opcua.stack.core.types.builtin.NodeId;
 import org.eclipse.milo.opcua.stack.core.types.builtin.StatusCode;
-import org.eclipse.milo.opcua.stack.core.types.builtin.Variant;
 import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.UInteger;
 import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.UShort;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.TimestampsToReturn;
@@ -33,10 +32,9 @@ import org.eclipse.milo.opcua.stack.core.types.structured.WriteValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.gson.JsonElement;
-
 import io.drogue.doppelgaenger.opcua.ThingsSubscriptionManager;
 import io.drogue.doppelgaenger.opcua.client.BasicFeature;
+import io.drogue.doppelgaenger.opcua.client.Client;
 import io.drogue.doppelgaenger.opcua.client.Thing;
 
 public class PropertyNamespace implements AddressSpaceFragment {
@@ -51,9 +49,12 @@ public class PropertyNamespace implements AddressSpaceFragment {
 
     private final Map<UInteger, ThingsSubscriptionManager.Subscription> dataItems = new ConcurrentHashMap<>();
 
-    PropertyNamespace(final OpcUaServer server, final ThingsSubscriptionManager subscriptions) {
+    private final Client client;
+
+    PropertyNamespace(@NonNull final OpcUaServer server, @NonNull final ThingsSubscriptionManager subscriptions, @NonNull final Client client) {
         this.subscriptions = subscriptions;
         this.namespaceIndex = server.getNamespaceTable().addUri(NAMESPACE_URI);
+        this.client = client;
     }
 
     @Override
@@ -96,8 +97,8 @@ public class PropertyNamespace implements AddressSpaceFragment {
             return completedFuture(null);
         } else {
             final var node = fromId(next.getNodeId());
-            logger.info("Failed to parse node ({})", next.getNodeId());
             if (node == null) {
+                logger.info("Failed to parse node ({})", next.getNodeId());
                 result.add(new DataValue(StatusCodes.Bad_NodeIdInvalid));
                 return handleRead(ids, result);
             } else {
@@ -174,19 +175,12 @@ public class PropertyNamespace implements AddressSpaceFragment {
         if (state.isPresent()) {
             final var thing = state.get();
 
-            BasicFeature merged = thing.getReportedState().get(name);
-            if (merged == null) {
-                merged = thing.getSyntheticState().get(name);
-            }
+            final BasicFeature merged = thing.mergedState(name).orElse(null);
 
             logger.debug("reportValue - state: {}, merged: {}", thing, merged);
 
             if (merged != null) {
-                final var value = new DataValue(
-                        toVariant(merged.getValue()),
-                        StatusCode.GOOD,
-                        new DateTime(merged.getLastUpdate().toInstant())
-                );
+                final var value = Values.toDataValue(merged);
                 logger.debug("Reporting: {}", value);
                 item.setValue(value);
             } else {
@@ -196,44 +190,6 @@ public class PropertyNamespace implements AddressSpaceFragment {
         } else {
             item.setQuality(StatusCode.UNCERTAIN);
         }
-    }
-
-    /**
-     * Convert a Doppelgaenger value (JSON) into an OPC UA variant type.
-     *
-     * @param value The JSON value.
-     * @return The variant type.
-     */
-    private static Variant toVariant(final JsonElement value) {
-
-        if (value == null || value.isJsonNull()) {
-            return new Variant(null);
-        }
-
-        if (value.isJsonPrimitive()) {
-            final var p = value.getAsJsonPrimitive();
-            if (p.isNumber()) {
-                return new Variant(p.getAsNumber().doubleValue());
-            } else if (p.isBoolean()) {
-                return new Variant(p.getAsBoolean());
-            } else {
-                return new Variant(p.getAsString());
-            }
-        }
-
-        if (value.isJsonArray()) {
-            final var items = value.getAsJsonArray();
-            final var array = new Variant[items.size()];
-            var i = 0;
-            for (final var item : items) {
-                array[i] = toVariant(item);
-                i++;
-            }
-            return new Variant(array);
-        }
-
-        return new Variant(value.toString());
-
     }
 
     @Override
@@ -295,7 +251,7 @@ public class PropertyNamespace implements AddressSpaceFragment {
 
         try {
             final var split = splitNodeId(id.getIdentifier());
-            return new PropertyNode(id, split[0], split[1], this);
+            return new PropertyNode(id, split[0], split[1], this, this.client);
         } catch (final Exception e) {
             return null;
         }
