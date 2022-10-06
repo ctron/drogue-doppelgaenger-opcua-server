@@ -109,7 +109,7 @@ public class ThingsSubscriptionManager {
             this.listenerLock.lock();
 
             final var t = this.listeners.get(thingName);
-            if (t.detach(handle)) {
+            if (t != null && t.detach(handle)) {
                 this.listeners.remove(thingName);
                 t.close();
             }
