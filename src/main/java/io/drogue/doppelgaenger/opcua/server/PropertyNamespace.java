@@ -26,7 +26,6 @@ import org.eclipse.milo.opcua.stack.core.types.builtin.StatusCode;
 import org.eclipse.milo.opcua.stack.core.types.builtin.Variant;
 import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.UInteger;
 import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.UShort;
-import org.eclipse.milo.opcua.stack.core.types.enumerated.IdType;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.TimestampsToReturn;
 import org.eclipse.milo.opcua.stack.core.types.structured.ReadValueId;
 import org.eclipse.milo.opcua.stack.core.types.structured.ViewDescription;
@@ -73,7 +72,7 @@ public class PropertyNamespace implements AddressSpaceFragment {
                 .thenCompose(x -> handleRead(ids, result))
                 .whenComplete((x, err) -> {
 
-                    logger.debug("read complete", err);
+                    logger.debug("read complete: {}", result, err);
                     try {
                         if (err != null) {
                             context.failure(StatusCode.BAD);
@@ -97,6 +96,7 @@ public class PropertyNamespace implements AddressSpaceFragment {
             return completedFuture(null);
         } else {
             final var node = fromId(next.getNodeId());
+            logger.info("Failed to parse node ({})", next.getNodeId());
             if (node == null) {
                 result.add(new DataValue(StatusCodes.Bad_NodeIdInvalid));
                 return handleRead(ids, result);
@@ -104,10 +104,10 @@ public class PropertyNamespace implements AddressSpaceFragment {
                 return node
                         .readAttribute(next.getAttributeId())
                         .handle((value, err) -> {
-                            if (value != null) {
-                                result.add(value);
-                            } else {
+                            if (err != null) {
                                 result.add(new DataValue(StatusCode.BAD));
+                            } else {
+                                result.add(value);
                             }
                             return handleRead(ids, result);
                         })
@@ -272,8 +272,12 @@ public class PropertyNamespace implements AddressSpaceFragment {
     }
 
     NodeId propertyNodeId(final String thing, final String name) {
+        return propertyNodeIdJoin(this.namespaceIndex, thing, name);
+    }
+
+    static NodeId propertyNodeIdJoin(final UShort namespaceIndex, final String thing, final String name) {
         final var s = thing + "#" + URLEncoder.encode(name, StandardCharsets.UTF_8);
-        return new NodeId(this.namespaceIndex, s);
+        return new NodeId(namespaceIndex, s);
     }
 
     /**
@@ -286,9 +290,6 @@ public class PropertyNamespace implements AddressSpaceFragment {
      */
     PropertyNode fromId(final NodeId id) {
         if (!id.getNamespaceIndex().equals(this.namespaceIndex)) {
-            return null;
-        }
-        if (!id.getType().equals(IdType.Opaque)) {
             return null;
         }
 

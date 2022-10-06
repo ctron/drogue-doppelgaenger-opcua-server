@@ -1,4 +1,9 @@
 "%dev":
+  quarkus:
+    log:
+      category:
+        "io.drogue":
+          level: DEBUG
   drogue:
     doppelgaenger:
       opcua:
